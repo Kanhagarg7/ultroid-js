@@ -1,0 +1,5 @@
+node_modules/
+.tgcloud/
+.env
+*.log
+.DS_Store

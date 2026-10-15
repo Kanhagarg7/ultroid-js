@@ -1,0 +1,16 @@
+{
+  "name": "ultroid-js",
+  "version": "2.1.2",
+  "description": "Ultroid userbot ported to JavaScript for Telegram Serverless (tgcloud). Original Python: https://github.com/TeamUltroid/Ultroid",
+  "type": "module",
+  "scripts": {
+    "deploy": "npx tgcloud push",
+    "status": "npx tgcloud status",
+    "migrate": "npx tgcloud migrate",
+    "run": "npx tgcloud run"
+  },
+  "devDependencies": {
+    "@tgcloud/cli": "^0.2.0"
+  },
+  "license": "AGPL-3.0-or-later"
+}
