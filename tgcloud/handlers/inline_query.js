@@ -1,8 +1,8 @@
 // tgcloud/handlers/inline_query.js
 // Routes inline queries. Replaces @in_pattern(...) handlers.
 import { api } from 'sdk';
-import '../lib/plugins/index.js';
-import { INLINE_REGISTRY } from '../lib/decorators.js';
+import '../lib/plugins.js';
+import { INLINE_REGISTRY } from '../lib/core.js';
 
 export default async function (query) {
   const text = (query.query || '').trim();

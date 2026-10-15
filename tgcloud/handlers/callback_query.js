@@ -2,8 +2,8 @@
 // Routes button presses. Replaces @callback(...) handlers across plugins/
 // (calculator, help menu, pmpermit, greetings, etc.).
 import { api } from 'sdk';
-import '../lib/plugins/index.js';
-import { CALLBACK_REGISTRY } from '../lib/decorators.js';
+import '../lib/plugins.js';
+import { CALLBACK_REGISTRY } from '../lib/core.js';
 
 export default async function (query) {
   const data = query.data || '';

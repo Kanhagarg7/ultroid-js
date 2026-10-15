@@ -5,15 +5,10 @@
 // Only Bot API messages arrive here (no outgoing MTProto events on Serverless).
 import { api, db } from 'sdk';
 import { eq, and } from 'sdk/db';
-import { loadConfig } from '../lib/config.js';
-import { getKey } from '../lib/database.js';
-import { get_string } from '../lib/strings.js';
-import { CMD_REGISTRY } from '../lib/decorators.js';
-import { afk } from '../schema.js';
+import { loadConfig, getKey, get_string, CMD_REGISTRY, PASSIVE_MONITORS } from '../lib/core.js';
 
 // Register all ported plugins (side-effect: fills CMD_REGISTRY etc.)
-import '../lib/plugins/index.js';
-import { runPassiveMonitors } from '../lib/plugins/_monitors.js';
+import '../lib/plugins.js';
 
 function stripPrefix(text, hndlrs) {
   if (!text) return null;
@@ -40,7 +35,7 @@ export default async function (message) {
     // 1) Passive monitors first (AFK auto-reply, filters, notes, blacklist,
     //    antiflood, chatbot, echo, greetings, nsfw...) - mirrors _chatactions.py
     try {
-      await runPassiveMonitors({ message, api, db, cfg });
+      for (const mon of PASSIVE_MONITORS) await mon({ message, api, db, cfg });
     } catch (e) {
       console.error('monitors failed', e?.stack || e);
     }
