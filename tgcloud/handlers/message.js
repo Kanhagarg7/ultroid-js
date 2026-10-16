@@ -61,6 +61,12 @@ export default async function (message) {
       if (!m) continue;
       if (reg.owner_only && !isOwner) continue;
       if (reg.sudo && !isSudo) continue;
+      if (reg.groups_only && event.isPrivate) {
+        try {
+          await api.sendMessage({ chat_id: chatId, text: get_string('py_d3') });
+        } catch {}
+        return { handled: reg.source };
+      }
       // groups_only / admins_only enforced inside handlers via Bot API
       const event = {
         message,
