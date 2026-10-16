@@ -5,7 +5,7 @@ const PLUGIN_COUNT = 83;
 import { ultroidCmd, getKey, setKey, delKey, get_string, callback as regCallback, safeEval, in_pattern as regInline, udB, KeyManager, getString, ultroid_cmd, asst_cmd, eor, cmdRegexReplace, getHelp, humanTime, escapeHtml, parseArgs, isUrl, PASSIVE_MONITORS } from './core.js';
 import { blacklistWords, snips, greetings, antiflood, gmutes, gbans, mutes, afk as afkTable, filters, notes, warns, floodTrack, echos, nsfwChats, filestore, forcesub } from '../schema.js';
 import { db, api, fetch } from 'sdk';
-import { eq, and } from 'sdk/db';
+import { eq, and, sql } from 'sdk/db';
 
 { // ===== lib/plugins/afk.js =====
 // Ultroid-JS port of plugins/afk.py — full logic, Bot API adapted.
@@ -1951,8 +1951,8 @@ ultroidCmd('listblacklist$', { admins_only: true }, async (e) => {
 // log-file carbon and Telethon resolve_bot_file_id are server/MTProto-only;
 // commands keep identical texts, answering via Bot API with static build info.
 
-const state_bot_version = '1.0';
-const state_bot_pyver = '3.11';
+const state_bot_version = '2.1.2';
+const state_bot_pyver = 'V8 JS';
 
 function bot_supportKb() {
   return {
@@ -1974,7 +1974,7 @@ async function bot_uptime() {
 }
 
 regCallback(/^alive$/)(async ({ api, query }) => {
-  const text = `The Ultroid Userbot\n\n  ◍ Version - ${state_bot_version}\n  ◍ Py-Ultroid - bot-api\n  ◍ Bot API - V8 isolate`;
+  const text = `The Ultroid Userbot\n\n  Version - 2.1.2 [serverless]\n  Py-Ultroid - 2.1.2-js\n  Runtime - V8 isolate (Bot API)`;
   await api.answerCallbackQuery({ callback_query_id: query.id, text });
 });
 
@@ -1982,33 +1982,54 @@ ultroidCmd('alive( (.*)|$)', async (e) => {
   const match = (e.args || '').trim();
   const uptime = await bot_uptime();
   const header = (await getKey('ALIVE_TEXT')) || get_string('bot_1');
-  const als = get_string(
+  const ownerId = await getKey('OWNER_ID');
+  const ownerName =
+    (await getKey('OWNER_NAME')) ||
+    (ownerId ? `[owner](tg://user?id=${ownerId})` : 'owner');
+  let als = get_string(
     'alive_1',
     header,
-    'owner',
+    ownerName,
     `${state_bot_version} [serverless]`,
-    'bot-api',
+    '2.1.2-js',
     uptime,
     state_bot_pyver,
-    'bot-api',
-    'main'
+    'Bot API',
+    (await getKey('BRANCH')) || 'main'
   );
+  const emoji = await getKey('ALIVE_EMOJI');
+  if (emoji) als = als.split('✵').join(emoji);
   const pic = await getKey('ALIVE_PIC');
   void match;
-  void pic;
+  if (pic) {
+    try {
+      await e.api.sendPhoto({ chat_id: e.chatId, photo: pic, caption: als, reply_markup: bot_supportKb() });
+      return;
+    } catch {}
+  }
   await e.api.sendMessage({ chat_id: e.chatId, text: als, reply_markup: bot_supportKb() });
 });
 
 ultroidCmd('ping$', async (e) => {
   const start = Date.now();
-  await e.api.sendMessage({ chat_id: e.chatId, text: 'Pong !' });
+  let sent = null;
+  try {
+    sent = await e.api.sendMessage({ chat_id: e.chatId, text: 'Pong !' });
+  } catch {
+    return;
+  }
   const end = Date.now() - start;
   const uptime = await bot_uptime();
-  await e.api.sendMessage({ chat_id: e.chatId, text: get_string('ping', end, uptime) });
+  const text = get_string('ping', end, uptime);
+  try {
+    await e.api.editMessageText({ chat_id: e.chatId, message_id: sent.message_id, text });
+  } catch {
+    await e.api.sendMessage({ chat_id: e.chatId, text });
+  }
 });
 
 ultroidCmd('cmds$', async (e) => {
-  await e.api.sendMessage({ chat_id: e.chatId, text: 'Command list is available via the help menu.' });
+  await e.api.sendMessage({ chat_id: e.chatId, text: `**Ultroid-JS plugin list** — \`83\` plugins ported.\nSend \`.help\` for the menu or \`.help <plugin>\` for details.` });
 });
 
 ultroidCmd('restart$', { sudo: true }, async (e) => {
@@ -6690,25 +6711,40 @@ ultroidCmd('unsplash( (.*)|$)', async (e) => {
 }
 { // ===== ports/D/usage.js =====
 
-function simpleUsage_usage() {
-  // Degraded: psutil/shutil unavailable in V8 isolate; report placeholder values in SAME template.
-  const TOTAL = 'N/A';
-  const USED = 'N/A';
-  const FREE = 'N/A';
-  const upload = 'N/A';
-  const down = 'N/A';
-  const cpuUsage = 'N/A';
-  const memory = 'N/A';
-  const disk = 'N/A';
-  return get_string('usage_simple', TOTAL, USED, FREE, upload, down, cpuUsage, memory, disk);
+async function simpleUsage_usage() {
+  // Serverless has no psutil disks/cpu counters; report real platform stats instead.
+  const boot = Number((await getKey('BOOT_TIME')) || Date.now());
+  const s = Math.floor((Date.now() - boot) / 1000);
+  const up = `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m ${s % 60}s`;
+  let tbl = 0, rows = 0;
+  try {
+    const tables = await db.all(sql`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`);
+    tbl = tables.length;
+    for (const t of tables) {
+      const nm = t.name.replace(/"/g, '');
+      const c = await db.get(sql.raw(`SELECT COUNT(*) AS c FROM "${nm}"`));
+      rows += Number(c.c || 0);
+    }
+  } catch {}
+  return `**⚙️ Serverless Usage ⚙️**\n\n**Uptime** - \`${up}\`\n**Plugins** - \`83\`\n**Runtime** - \`V8 isolate\`\n\n**📊 Data Usage 📊**\n**Tables**: \`${tbl}\`\n**Rows**: \`${rows}\``;
 }
 
-function dbUsage_usage() {
-  // Degraded: udB.usage/quotas unavailable; keep SAME reply format as Python db_usage().
-  const name = 'KV';
-  const a = 'N/A/N/A';
-  const b = 'N/A%';
-  return `**${name}**\n\n**Storage Used**: \`${a}\`\n**Usage percentage**: **${b}**`;
+async function dbUsage_usage() {
+  // Same reply shape as Python db_usage(), with real tgcloud-sqlite stats.
+  let tbl = 0, rows = 0;
+  const per = [];
+  try {
+    const tables = await db.all(sql`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`);
+    tbl = tables.length;
+    for (const t of tables) {
+      const nm = t.name.replace(/"/g, '');
+      const c = await db.get(sql.raw(`SELECT COUNT(*) AS c FROM "${nm}"`));
+      const n = Number(c.c || 0);
+      rows += n;
+      per.push(`\`${nm}\`: ${n}`);
+    }
+  } catch {}
+  return `**tgcloud-sqlite**\n\n**Storage Used**: \`${rows} rows / ${tbl} tables\`\n\n${per.join('\n')}`;
 }
 
 async function herokuUsage_usage() {
@@ -6756,27 +6792,36 @@ async function herokuUsage_usage() {
 
 ultroidCmd('usage', async (e) => {
   const raw = e.text || e.body || '';
-  await e.api.sendMessage({ chat_id: e.chatId, text: get_string('com_1') });
+  let sent = null;
+  try {
+    sent = await e.api.sendMessage({ chat_id: e.chatId, text: get_string('com_1') });
+  } catch {
+    return;
+  }
+  const done = async (text) => {
+    try {
+      await e.api.editMessageText({ chat_id: e.chatId, message_id: sent.message_id, text });
+    } catch {
+      await e.api.sendMessage({ chat_id: e.chatId, text });
+    }
+  };
   let opt = '';
   const parts = raw.split(/\s+/);
   if (parts.length > 1) opt = parts[1].trim();
   if (!opt) {
-    await e.api.sendMessage({ chat_id: e.chatId, text: simpleUsage_usage() });
+    await done(await simpleUsage_usage());
     return;
   }
   if (opt === 'db') {
-    await e.api.sendMessage({ chat_id: e.chatId, text: dbUsage_usage() });
+    await done(await dbUsage_usage());
     return;
   }
   if (opt === 'heroku') {
-    const res = await herokuUsage_usage();
-    await e.api.sendMessage({ chat_id: e.chatId, text: res[1] });
+    await done('`This command is only for Heroku Users, You are using serverless`');
     return;
   }
-  const hk = await herokuUsage_usage();
-  const her = hk[0] ? hk[1] : '';
-  const rd = dbUsage_usage();
-  await e.api.sendMessage({ chat_id: e.chatId, text: `${her}\n\n${rd}` });
+  const rd = await dbUsage_usage();
+  await done(rd);
 });
 }
 { // ===== ports/D/utilities.js =====

@@ -643,11 +643,12 @@ const INLINE_REGISTRY = []; // { pattern: string|RegExp, handler, owner }
 const ASST_REGISTRY = []; // { cmd: string, handler }
 
 function compilePattern(pattern) {
-  // Ultroid patterns are Python regexes matched against the message text
-  // AFTER the handler prefix (e.g. ".afk hello" -> "afk hello").
-  // We keep them as JS RegExp with same source where possible.
+  // Ultroid patterns are Python regexes matched with re.match (prefix match),
+  // NOT fullmatch — e.g. pattern "usage" must also match "usage db".
+  // Only anchor at the end when the pattern itself ends with $.
   try {
-    return new RegExp(`^(?:${pattern})$`, 'is');
+    const anchored = /\$$/.test(pattern) ? `^(?:${pattern})$` : `^(?:${pattern})`;
+    return new RegExp(anchored, 'is');
   } catch {
     return new RegExp('^$');
   }

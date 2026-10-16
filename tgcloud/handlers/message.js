@@ -5,7 +5,7 @@
 // Only Bot API messages arrive here (no outgoing MTProto events on Serverless).
 import { api, db } from 'sdk';
 import { eq, and } from 'sdk/db';
-import { loadConfig, getKey, get_string, CMD_REGISTRY, PASSIVE_MONITORS } from '../lib/core.js';
+import { loadConfig, getKey, setKey, get_string, CMD_REGISTRY, PASSIVE_MONITORS } from '../lib/core.js';
 
 // Register all ported plugins (side-effect: fills CMD_REGISTRY etc.)
 import '../lib/plugins.js';
@@ -25,6 +25,9 @@ function stripPrefix(text, hndlrs) {
 export default async function (message) {
   try {
     const cfg = await loadConfig();
+    if (!(await getKey('BOOT_TIME'))) {
+      try { await setKey('BOOT_TIME', Date.now()); } catch {}
+    }
     const hndlrs = [cfg.HNDLR, cfg.DUAL_HNDLR, cfg.SUDO_HNDLR, '.', '/', '!', '?'].filter(Boolean);
     const uniq = [...new Set(hndlrs)];
     const text = (message.text || message.caption || '').trim();
